@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trading Desk</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230f1419%27/%3E%3Cpath d=%27M5 22l7-8 5 5 10-11%27 fill=%27none%27 stroke=%27%234cc2ff%27 stroke-width=%273%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">Trading Desk</span>
+      <span class="brand-sub">multi-agent analysis on TradingAgents</span>
+    </div>
+    <div class="topbar-right">
+      <span id="server-status" class="pill pill-muted">connecting…</span>
+      <button id="token-btn" class="btn btn-ghost hidden" type="button">API token</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="card">
+        <h2>New analysis</h2>
+        <form id="run-form" autocomplete="off">
+          <label class="field">
+            <span>Ticker</span>
+            <input id="f-ticker" name="ticker" type="text" required maxlength="32" placeholder="SPY, 0700.HK, BTC-USD">
+            <small id="ticker-note" class="note hidden"></small>
+          </label>
+          <label class="field">
+            <span>Analysis date</span>
+            <input id="f-date" name="analysis_date" type="date" required>
+          </label>
+          <fieldset class="field">
+            <legend>Analysts</legend>
+            <div id="f-analysts" class="checks"></div>
+          </fieldset>
+          <label class="field">
+            <span>Research depth</span>
+            <select id="f-depth" name="research_depth"></select>
+          </label>
+          <label class="field">
+            <span>LLM provider</span>
+            <select id="f-provider" name="llm_provider"></select>
+          </label>
+          <div id="key-block" class="key-block">
+            <div class="key-head">
+              <span id="key-label">API key</span>
+              <span id="key-status" class="pill">…</span>
+            </div>
+            <div id="key-form" class="key-form">
+              <input id="f-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste your key, e.g. sk-…">
+              <button id="key-save" class="btn" type="button">Save key</button>
+            </div>
+            <div class="key-actions">
+              <button id="key-change" class="btn btn-ghost hidden" type="button">Change key</button>
+              <button id="key-forget" class="btn btn-ghost hidden" type="button">Forget key</button>
+            </div>
+            <small id="key-note" class="note"></small>
+          </div>
+          <label class="field hidden" id="backend-field">
+            <span>Backend URL</span>
+            <input id="f-backend-url" name="backend_url" type="url" placeholder="http://localhost:8000/v1">
+          </label>
+          <div class="field">
+            <span>Quick-thinking model</span>
+            <select id="f-quick" class="model-select"></select>
+            <input id="f-quick-custom" class="model-custom hidden" type="text" placeholder="model id">
+          </div>
+          <div class="field">
+            <span>Deep-thinking model</span>
+            <select id="f-deep" class="model-select"></select>
+            <input id="f-deep-custom" class="model-custom hidden" type="text" placeholder="model id">
+          </div>
+          <label class="field hidden" id="thinking-field">
+            <span id="thinking-label">Reasoning</span>
+            <select id="f-thinking"></select>
+          </label>
+          <div class="field">
+            <span>Report language</span>
+            <select id="f-language"></select>
+            <input id="f-language-custom" class="hidden" type="text" placeholder="e.g. Turkish">
+          </div>
+          <details class="field">
+            <summary>Portfolio context (optional)</summary>
+            <textarea id="f-portfolio" rows="5" placeholder='{"cash": 10000, "currency": "USD", "positions": [{"ticker": "AAPL", "quantity": 10, "average_price": 180}]}'></textarea>
+            <small class="note">Holdings and cash, so the trader and risk agents size against your real book.</small>
+          </details>
+          <label class="check-inline">
+            <input id="f-checkpoint" type="checkbox">
+            <span>Save checkpoints (resume a crashed run)</span>
+          </label>
+          <div id="form-error" class="alert hidden"></div>
+          <button id="f-submit" class="btn btn-primary" type="submit">Run analysis</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Runs</h2>
+        <ul id="run-list" class="run-list"></ul>
+        <p id="run-list-empty" class="muted">No runs yet.</p>
+      </section>
+    </aside>
+
+    <section class="content">
+      <div id="empty-state" class="empty">
+        <h2>Pick a ticker to start</h2>
+        <p>Analysts, researchers, a trader, the risk team and the portfolio manager work the name in turn. Progress and each report appear here as they land.</p>
+        <p class="muted">Research tool, not investment advice.</p>
+      </div>
+
+      <div id="run-panel" class="hidden">
+        <div class="run-header">
+          <div>
+            <h2 id="rp-title"></h2>
+            <div id="rp-meta" class="muted"></div>
+          </div>
+          <div class="run-header-right">
+            <span id="rp-signal" class="signal hidden"></span>
+            <span id="rp-status" class="pill"></span>
+            <span id="rp-elapsed" class="mono muted"></span>
+            <button id="rp-cancel" class="btn btn-danger hidden" type="button">Stop</button>
+            <button id="rp-download" class="btn hidden" type="button">Download report</button>
+          </div>
+        </div>
+        <div id="rp-error" class="alert hidden"></div>
+
+        <div class="grid-2">
+          <section class="card">
+            <h3>Progress</h3>
+            <table class="agents">
+              <thead><tr><th>Team</th><th>Agent</th><th>Status</th></tr></thead>
+              <tbody id="rp-agents"></tbody>
+            </table>
+            <div id="rp-stats" class="stats"></div>
+          </section>
+          <section class="card">
+            <h3>Messages &amp; tools</h3>
+            <ul id="rp-feed" class="feed"></ul>
+          </section>
+        </div>
+
+        <section class="card">
+          <h3>Reports</h3>
+          <div id="rp-tabs" class="tabs"></div>
+          <article id="rp-report" class="report markdown"></article>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

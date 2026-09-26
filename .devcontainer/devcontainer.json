@@ -1,0 +1,13 @@
+{
+  "name": "Trading Desk",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "postCreateCommand": "pip install -e \".[dev]\"",
+  "postStartCommand": "nohup tradingdesk --host 0.0.0.0 --port 8000 > /tmp/tradingdesk.log 2>&1 &",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "Trading Desk", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["ms-python.python"] }
+  }
+}

@@ -1,0 +1,24 @@
+# One-click deploy of the Trading Desk web app on Render:
+# https://render.com/deploy?repo=https://github.com/ebleach2010/trading-desk
+#
+# Render asks for the provider key(s) when you deploy (sync: false) and generates
+# the API token; both are then visible under the service's Environment tab. The
+# free plan sleeps after 15 minutes idle and has no persistent disk, so run
+# history and keys pasted in the app do not survive a restart there; keys set
+# as environment variables do.
+services:
+  - type: web
+    name: trading-desk
+    runtime: python
+    plan: free
+    buildCommand: pip install ".[web]"
+    startCommand: tradingdesk --host 0.0.0.0
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: TRADINGDESK_API_TOKEN
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

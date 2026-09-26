@@ -1,0 +1,52 @@
+services:
+  tradingagents:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+    tty: true
+    stdin_open: true
+
+  # The Trading Desk web app at http://localhost:8000. Set TRADINGDESK_API_TOKEN
+  # in .env before publishing the port beyond this machine.
+  web:
+    build: .
+    env_file:
+      - .env
+    entrypoint: ["tradingdesk"]
+    command: ["--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      # Keys pasted in the app persist on the data volume, not in the container.
+      - TRADINGDESK_ENV_FILE=/home/appuser/.tradingagents/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - ollama
+
+  tradingagents-ollama:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - TRADINGAGENTS_LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+    depends_on:
+      - ollama
+    tty: true
+    stdin_open: true
+    profiles:
+      - ollama
+
+volumes:
+  tradingagents_data:
+  ollama_data:
