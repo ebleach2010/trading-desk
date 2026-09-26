@@ -8,6 +8,19 @@ services:
     tty: true
     stdin_open: true
 
+  # The Trading Desk web app at http://localhost:8000. Set TRADINGDESK_API_TOKEN
+  # in .env before publishing the port beyond this machine.
+  web:
+    build: .
+    env_file:
+      - .env
+    entrypoint: ["tradingdesk"]
+    command: ["--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+
   ollama:
     image: ollama/ollama:latest
     volumes:

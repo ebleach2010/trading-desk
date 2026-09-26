@@ -8,7 +8,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 COPY . .
-RUN pip install --no-cache-dir .
+# The web extra adds the Trading Desk server; `tradingdesk` is available beside the CLI.
+RUN pip install --no-cache-dir ".[web]"
 
 FROM python:3.12-slim
 

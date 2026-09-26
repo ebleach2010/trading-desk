@@ -32,6 +32,15 @@ dev = [
     "ruff>=0.15",
     "pytest>=8.0",
     "pytest-subtests>=0.13",
+    # The web app's dependencies, so its tests run under `pip install -e ".[dev]"`.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+]
+# The Trading Desk web app: pip install ".[web]", then `tradingdesk`.
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 # Amazon Bedrock support (AWS SigV4 auth + boto3). Optional so the core install
 # stays lean: pip install "tradingagents[bedrock]".
@@ -41,12 +50,14 @@ bedrock = [
 
 [project.scripts]
 tradingagents = "cli.main:app"
+tradingdesk = "tradingdesk.server:main"
 
 [tool.setuptools.packages.find]
-include = ["tradingagents*", "cli*"]
+include = ["tradingagents*", "cli*", "tradingdesk*"]
 
 [tool.setuptools.package-data]
 cli = ["static/*"]
+tradingdesk = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

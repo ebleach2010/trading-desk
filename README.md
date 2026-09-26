@@ -14,6 +14,29 @@ git fetch upstream
 git merge upstream/main
 ```
 
+## Web app
+
+The desk also runs in the browser: a form to start an analysis, live progress for
+every agent, each report as it lands, and a history of past runs.
+
+```bash
+pip install -e ".[web]"
+tradingdesk                     # serves http://127.0.0.1:8000
+```
+
+Or with Docker: `docker compose up web`, then open http://localhost:8000.
+
+Runs use the same `.env` keys and `TRADINGAGENTS_*` defaults as the CLI, and the
+keys never leave the server. Each run writes its reports and a `run.json` under
+`~/.tradingagents/logs/<ticker>/<date>/runs/<id>/`, and the decision log is
+shared with the CLI. The JSON API is documented at `/api/docs`.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `TRADINGDESK_HOST`, `TRADINGDESK_PORT` | `127.0.0.1`, `8000` | Where the server listens; `--host` and `--port` override them. |
+| `TRADINGDESK_API_TOKEN` | unset | When set, every API call must send it as a bearer token. Set it before exposing the app beyond your own machine: a run spends your provider credits. |
+| `TRADINGDESK_MAX_CONCURRENT_RUNS` | `1` | How many analyses run at once; the rest wait in the queue. |
+
 Everything below this line is the upstream TradingAgents README for the imported release.
 
 ---
