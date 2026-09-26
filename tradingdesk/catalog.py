@@ -132,6 +132,12 @@ def missing_api_key(provider: str) -> str | None:
     return None if os.environ.get(env_var) else env_var
 
 
+def key_hint(env_var: str | None) -> str:
+    """The tail of a configured key: enough to recognise it in the UI, nothing more."""
+    value = os.environ.get(env_var) if env_var else None
+    return value[-4:] if value and len(value) >= 12 else ""
+
+
 def default_backend_url(provider: str) -> str | None:
     """The endpoint the CLI menu would pick for ``provider``, regional keys included."""
     for _, key, url, _ in REGION_PROVIDERS:
@@ -153,6 +159,7 @@ def _provider_row(label: str, key: str, url: str | None, region_of: str | None =
         "api_key_env": env_var,
         "key_required": env_var is not None and not key_optional,
         "key_configured": bool(os.environ.get(env_var)) if env_var else None,
+        "key_hint": key_hint(env_var),
         "models": model_choices(key),
         "thinking": THINKING_OPTIONS.get(key),
     }
@@ -167,6 +174,11 @@ def providers() -> list[dict]:
 
 def known_providers() -> set[str]:
     return {row["key"] for row in providers()}
+
+
+def provider_row(key: str) -> dict | None:
+    """One provider's row as ``providers`` lists it, or None for an unknown key."""
+    return next((row for row in providers() if row["key"] == key), None)
 
 
 def options() -> dict:

@@ -26,8 +26,17 @@ tradingdesk                     # serves http://127.0.0.1:8000
 
 Or with Docker: `docker compose up web`, then open http://localhost:8000.
 
-Runs use the same `.env` keys and `TRADINGAGENTS_*` defaults as the CLI, and the
-keys never leave the server. Each run writes its reports and a `run.json` under
+Or without installing anything: on GitHub, **Code → Codespaces → Create
+codespace**. The dev container installs the desk and starts it on port 8000, and
+the Ports tab shows the URL (private to your GitHub login unless you change it).
+
+Paste your provider's API key in the app: the box under the LLM provider
+dropdown saves it to the server's `.env` (or `TRADINGDESK_ENV_FILE`), readable
+by the server's user only, and never sends it back to the browser. The CLI's
+key prompt writes the same file, so the two share keys.
+
+Runs use the same `.env` keys and `TRADINGAGENTS_*` defaults as the CLI. Each
+run writes its reports and a `run.json` under
 `~/.tradingagents/logs/<ticker>/<date>/runs/<id>/`, and the decision log is
 shared with the CLI. The JSON API is documented at `/api/docs`.
 
@@ -36,6 +45,7 @@ shared with the CLI. The JSON API is documented at `/api/docs`.
 | `TRADINGDESK_HOST`, `TRADINGDESK_PORT` | `127.0.0.1`, `8000` | Where the server listens; `--host` and `--port` override them. |
 | `TRADINGDESK_API_TOKEN` | unset | When set, every API call must send it as a bearer token. Set it before exposing the app beyond your own machine: a run spends your provider credits. |
 | `TRADINGDESK_MAX_CONCURRENT_RUNS` | `1` | How many analyses run at once; the rest wait in the queue. |
+| `TRADINGDESK_ENV_FILE` | the `.env` the package loads | Where keys pasted in the app are stored. The Docker service points it at the data volume. |
 
 Everything below this line is the upstream TradingAgents README for the imported release.
 

@@ -24,6 +24,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +43,7 @@ from tradingagents.dataflows.symbols import safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.portfolio import PortfolioContext
 from tradingdesk import catalog
+from tradingdesk.keys import env_file_path, forget_api_key, save_api_key
 from tradingdesk.runs import TERMINAL_STATUSES, Run, RunManager
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,8 @@ class Settings:
     results_dir: str
     api_token: str | None = None
     max_workers: int = 1
+    # Where keys saved from the browser go; None means the .env the package loads.
+    env_file: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -79,6 +83,7 @@ class Settings:
             results_dir=DEFAULT_CONFIG["results_dir"],
             api_token=os.environ.get("TRADINGDESK_API_TOKEN") or None,
             max_workers=int(os.environ.get("TRADINGDESK_MAX_CONCURRENT_RUNS") or 1),
+            env_file=os.environ.get("TRADINGDESK_ENV_FILE") or None,
         )
 
 
@@ -182,6 +187,22 @@ class RunRequest(BaseModel):
         return value
 
 
+class ApiKeyRequest(BaseModel):
+    """A provider API key pasted into the form."""
+
+    api_key: str = Field(min_length=1, max_length=512)
+
+    @field_validator("api_key")
+    @classmethod
+    def _api_key(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("paste the key first")
+        if any(ch.isspace() for ch in value) or any(ch in value for ch in "'\""):
+            raise ValueError("a key has no spaces or quotes; check what was pasted")
+        return value
+
+
 def resolve_backend_url(req: RunRequest) -> str | None:
     """The form's URL; else the env override, when it was set for this provider; else the menu default."""
     if req.backend_url:
@@ -267,6 +288,10 @@ def event_stream(run: Run, after_seq: int = 0) -> Iterator[str]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the application; ``settings`` defaults to the environment's."""
     settings = settings or Settings.from_env()
+    # Keys saved from the browser live here; pick them up before the first run.
+    key_file = env_file_path(settings.env_file)
+    if settings.env_file and key_file.is_file():
+        load_dotenv(key_file, override=False)
     manager = RunManager(settings.results_dir, max_workers=settings.max_workers)
 
     @asynccontextmanager
@@ -316,9 +341,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "max_concurrent_runs": settings.max_workers,
         }
 
+    def key_env_for(provider: str) -> tuple[str, str]:
+        key = provider.strip().lower()
+        row = catalog.provider_row(key)
+        if row is None:
+            raise HTTPException(status_code=404, detail="no such provider")
+        if row["api_key_env"] is None:
+            raise HTTPException(
+                status_code=422, detail=f"the {key} provider does not use an API key"
+            )
+        return key, row["api_key_env"]
+
     @api.get("/options")
     def options() -> dict:
-        return catalog.options()
+        data = catalog.options()
+        data["env_file"] = str(key_file)
+        return data
+
+    @api.put("/keys/{provider}")
+    def save_key(provider: str, req: ApiKeyRequest) -> dict:
+        key, env_var = key_env_for(provider)
+        path = save_api_key(env_var, req.api_key, settings.env_file)
+        logger.info("Saved %s to %s", env_var, path)
+        return {"provider": catalog.provider_row(key), "env_file": str(path)}
+
+    @api.delete("/keys/{provider}")
+    def forget_key(provider: str) -> dict:
+        key, env_var = key_env_for(provider)
+        path = forget_api_key(env_var, settings.env_file)
+        logger.info("Removed %s from %s", env_var, path)
+        return {"provider": catalog.provider_row(key), "env_file": str(path)}
 
     @api.get("/runs")
     def list_runs() -> list[dict]:
@@ -344,7 +396,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=400,
                 detail=(
                     f"{missing} is not set on the server, so the {req.llm_provider} provider "
-                    "cannot run. Add it to the server's .env and restart."
+                    "cannot run. Paste the key in the API key box under the provider dropdown, "
+                    "or add it to the server's .env."
                 ),
             )
         backend_url = resolve_backend_url(req)

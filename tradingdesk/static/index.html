@@ -44,8 +44,22 @@
           <label class="field">
             <span>LLM provider</span>
             <select id="f-provider" name="llm_provider"></select>
-            <small id="key-warning" class="note warn hidden"></small>
           </label>
+          <div id="key-block" class="key-block">
+            <div class="key-head">
+              <span id="key-label">API key</span>
+              <span id="key-status" class="pill">…</span>
+            </div>
+            <div id="key-form" class="key-form">
+              <input id="f-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste your key, e.g. sk-…">
+              <button id="key-save" class="btn" type="button">Save key</button>
+            </div>
+            <div class="key-actions">
+              <button id="key-change" class="btn btn-ghost hidden" type="button">Change key</button>
+              <button id="key-forget" class="btn btn-ghost hidden" type="button">Forget key</button>
+            </div>
+            <small id="key-note" class="note"></small>
+          </div>
           <label class="field hidden" id="backend-field">
             <span>Backend URL</span>
             <input id="f-backend-url" name="backend_url" type="url" placeholder="http://localhost:8000/v1">

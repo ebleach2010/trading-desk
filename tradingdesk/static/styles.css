@@ -84,7 +84,7 @@ html, body {
   min-width: 0;
 }
 .field > span, .field > legend { font-size: 0.85rem; color: var(--muted); }
-input[type="text"], input[type="url"], input[type="date"], select, textarea {
+input[type="text"], input[type="url"], input[type="date"], input[type="password"], select, textarea {
   width: 100%;
   background: var(--panel-2);
   color: var(--text);
@@ -107,6 +107,23 @@ textarea { font-family: var(--mono); font-size: 0.85rem; resize: vertical; }
 .note.warn { color: var(--warn); }
 details.field summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
 details.field textarea { margin-top: 8px; }
+
+/* ---- provider API key ---- */
+.key-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: -4px 0 14px;
+  background: var(--panel-2);
+}
+.key-block.needs-key { border-color: var(--warn); box-shadow: 0 0 0 1px rgba(210, 153, 34, 0.35); }
+.key-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.key-form { display: flex; gap: 8px; }
+.key-form input { flex: 1; min-width: 0; background: var(--panel); font-family: var(--mono); font-size: 0.85rem; }
+.key-actions { display: flex; gap: 8px; }
 
 .btn {
   background: var(--panel-2);

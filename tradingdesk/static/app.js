@@ -16,6 +16,7 @@
     stream: null,     // AbortController of the open event stream
     activeTab: null,
     tabPinned: false, // the user picked a tab, so new sections stop stealing focus
+    keyEditing: false, // the user asked to replace a key that is already configured
   };
 
   const $ = (id) => document.getElementById(id);
@@ -162,7 +163,7 @@
     const depths = o.research_depths.map((r) => r.value);
     $('f-depth').value = String(depths.includes(d.research_depth) ? d.research_depth : depths[0]);
     $('f-provider').innerHTML = o.providers.map((p) => (
-      `<option value="${esc(p.key)}">${esc(p.label)}${p.key_required && p.key_configured === false ? ' (no key on server)' : ''}</option>`
+      `<option value="${esc(p.key)}">${providerOptionLabel(p)}</option>`
     )).join('');
     $('f-provider').value = o.providers.some((p) => p.key === d.llm_provider) ? d.llm_provider : o.providers[0].key;
     $('f-language').innerHTML = o.languages.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join('')
@@ -184,13 +185,9 @@
     const d = state.options.defaults;
     const isDefault = p.key === d.llm_provider;
 
-    const warn = $('key-warning');
-    if (p.key_required && p.key_configured === false) {
-      warn.textContent = `${p.api_key_env} is not set on the server; runs with this provider will be refused.`;
-      warn.classList.remove('hidden');
-    } else {
-      warn.classList.add('hidden');
-    }
+    state.keyEditing = false;
+    $('f-api-key').value = '';
+    renderKeyBlock();
 
     const showUrl = p.needs_backend_url || p.key === 'ollama';
     $('backend-field').classList.toggle('hidden', !showUrl);
@@ -285,6 +282,112 @@
       showFormError(err instanceof SyntaxError ? `Portfolio is not valid JSON: ${err.message}` : err.message);
     } finally {
       button.disabled = false;
+    }
+  }
+
+  // ---- provider API keys ---------------------------------------------------
+
+  function providerOptionLabel(p) {
+    return `${esc(p.label)}${p.key_required && p.key_configured === false ? ' (no key on server)' : ''}`;
+  }
+
+  function refreshProviderLabels() {
+    for (const option of $('f-provider').options) {
+      const p = state.options.providers.find((row) => row.key === option.value);
+      if (p) option.innerHTML = providerOptionLabel(p);
+    }
+  }
+
+  function updateProviderRow(row) {
+    const index = state.options.providers.findIndex((p) => p.key === row.key);
+    if (index >= 0) state.options.providers[index] = row;
+    refreshProviderLabels();
+  }
+
+  function showKeyNote(message, warn) {
+    const note = $('key-note');
+    note.textContent = message;
+    note.classList.toggle('warn', Boolean(warn));
+  }
+
+  function renderKeyBlock() {
+    const p = currentProvider();
+    if (!p) return;
+    const block = $('key-block');
+    const form = $('key-form');
+    const change = $('key-change');
+    const forget = $('key-forget');
+    const status = $('key-status');
+    const where = state.options.env_file ? ` in ${state.options.env_file}` : '';
+    block.classList.remove('needs-key');
+    if (!p.api_key_env) {
+      $('key-label').textContent = `${p.label} API key`;
+      status.textContent = p.key === 'bedrock' ? 'AWS credentials' : 'not needed';
+      status.className = 'pill';
+      form.classList.add('hidden');
+      change.classList.add('hidden');
+      forget.classList.add('hidden');
+      showKeyNote(p.key === 'bedrock'
+        ? 'Bedrock authenticates with the AWS credentials on the server (AWS_BEARER_TOKEN_BEDROCK or an AWS profile).'
+        : 'This provider does not authenticate.', false);
+      return;
+    }
+    $('key-label').textContent = `${p.label} API key (${p.api_key_env})`;
+    if (p.key_configured) {
+      status.textContent = p.key_hint ? `configured ····${p.key_hint}` : 'configured';
+      status.className = 'pill pill-ok';
+      form.classList.toggle('hidden', !state.keyEditing);
+      change.classList.toggle('hidden', state.keyEditing);
+      forget.classList.remove('hidden');
+      showKeyNote(`Saved on the server${where}. It is never sent back to the browser.`, false);
+    } else {
+      status.textContent = p.key_required ? 'not set' : 'optional, not set';
+      status.className = p.key_required ? 'pill pill-bad' : 'pill';
+      form.classList.remove('hidden');
+      change.classList.add('hidden');
+      forget.classList.add('hidden');
+      block.classList.toggle('needs-key', Boolean(p.key_required));
+      showKeyNote(p.key_required
+        ? `Paste your ${p.label} API key here. It is saved on the server${where} and used by every run.`
+        : 'Only needed when your endpoint requires one.', false);
+    }
+  }
+
+  async function saveKey() {
+    const p = currentProvider();
+    const input = $('f-api-key');
+    const key = input.value.trim();
+    if (!key) {
+      showKeyNote('Paste the key first.', true);
+      input.focus();
+      return;
+    }
+    const button = $('key-save');
+    button.disabled = true;
+    try {
+      const result = await api(`/api/keys/${p.key}`, {method: 'PUT', body: {api_key: key}});
+      input.value = '';
+      state.keyEditing = false;
+      updateProviderRow(result.provider);
+      renderKeyBlock();
+      showKeyNote(`Saved to ${result.env_file}. Runs with ${p.label} can start now.`, false);
+    } catch (err) {
+      showKeyNote(err.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function forgetKey() {
+    const p = currentProvider();
+    if (!window.confirm(`Remove the ${p.label} key from the server?`)) return;
+    try {
+      const result = await api(`/api/keys/${p.key}`, {method: 'DELETE'});
+      state.keyEditing = false;
+      updateProviderRow(result.provider);
+      renderKeyBlock();
+    } catch (err) {
+      showKeyNote(err.message, true);
     }
   }
 
@@ -561,6 +664,19 @@
       $('f-language-custom').classList.toggle('hidden', $('f-language').value !== CUSTOM);
     });
     $('f-ticker').addEventListener('input', onTickerInput);
+    $('key-save').addEventListener('click', saveKey);
+    $('f-api-key').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveKey();
+      }
+    });
+    $('key-change').addEventListener('click', () => {
+      state.keyEditing = true;
+      renderKeyBlock();
+      $('f-api-key').focus();
+    });
+    $('key-forget').addEventListener('click', forgetKey);
     $('run-list').addEventListener('click', (event) => {
       const item = event.target.closest('.run-item');
       if (item) selectRun(item.dataset.id).catch((err) => showFormError(err.message));

@@ -16,6 +16,9 @@ services:
       - .env
     entrypoint: ["tradingdesk"]
     command: ["--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      # Keys pasted in the app persist on the data volume, not in the container.
+      - TRADINGDESK_ENV_FILE=/home/appuser/.tradingagents/.env
     ports:
       - "8000:8000"
     volumes:

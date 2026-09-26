@@ -466,3 +466,65 @@ def test_cli_help_exits_cleanly(capsys):
         main(["--help"])
     assert exited.value.code == 0
     assert "--port" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_api_key_can_be_saved_and_forgotten_from_the_browser(tmp_path, fake_graph, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "")
+    env_file = tmp_path / "secrets" / ".env"
+    app = create_app(Settings(results_dir=str(tmp_path), env_file=str(env_file)))
+    with TestClient(app) as client:
+        def xai():
+            return {p["key"]: p for p in client.get("/api/options").json()["providers"]}["xai"]
+
+        assert client.get("/api/options").json()["env_file"] == str(env_file)
+        assert xai()["key_configured"] is False
+        assert client.post("/api/runs", json={"ticker": "AAPL", "llm_provider": "xai"}).status_code == 400
+
+        saved = client.put("/api/keys/xai", json={"api_key": "  xai-secret-key-1234  "})
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["provider"]["key_configured"] is True
+        assert saved.json()["provider"]["key_hint"] == "1234"
+        assert saved.json()["env_file"] == str(env_file)
+        assert "xai-secret-key" not in saved.text  # the key itself never goes back out
+        assert "XAI_API_KEY='xai-secret-key-1234'" in env_file.read_text(encoding="utf-8")
+        assert env_file.stat().st_mode & 0o777 == 0o600
+        assert xai()["key_configured"] is True
+
+        accepted = client.post("/api/runs", json={"ticker": "AAPL", "llm_provider": "xai"})
+        assert accepted.status_code == 202, accepted.text
+        _wait_terminal(client, accepted.json()["id"])
+
+        forgotten = client.delete("/api/keys/xai")
+        assert forgotten.status_code == 200
+        assert forgotten.json()["provider"]["key_configured"] is False
+        assert "XAI_API_KEY" not in env_file.read_text(encoding="utf-8")
+        assert xai()["key_configured"] is False
+
+        assert client.put("/api/keys/ollama", json={"api_key": "x"}).status_code == 422
+        assert client.put("/api/keys/nope", json={"api_key": "x"}).status_code == 404
+        assert client.put("/api/keys/xai", json={"api_key": "   "}).status_code == 422
+        assert client.put("/api/keys/xai", json={"api_key": "has space"}).status_code == 422
+        assert client.put("/api/keys/xai", json={"api_key": "quote'd"}).status_code == 422
+        assert xai()["key_configured"] is False
+
+
+@pytest.mark.unit
+def test_keys_saved_earlier_are_loaded_at_startup(tmp_path, fake_graph, monkeypatch):
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("XAI_API_KEY='saved-earlier-key-9876'\n", encoding="utf-8")
+    app = create_app(Settings(results_dir=str(tmp_path), env_file=str(env_file)))
+    with TestClient(app) as client:
+        row = {p["key"]: p for p in client.get("/api/options").json()["providers"]}["xai"]
+        assert row["key_configured"] is True
+        assert row["key_hint"] == "9876"
+
+
+@pytest.mark.unit
+def test_api_key_endpoints_need_the_token_too(tmp_path, fake_graph):
+    app = create_app(Settings(results_dir=str(tmp_path), api_token="s3cret", env_file=str(tmp_path / ".env")))
+    with TestClient(app) as client:
+        assert client.put("/api/keys/xai", json={"api_key": "xai-secret-key-1234"}).status_code == 401
+        assert client.delete("/api/keys/xai").status_code == 401
+    assert not (tmp_path / ".env").exists()
