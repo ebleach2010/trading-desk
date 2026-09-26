@@ -30,6 +30,16 @@ Or without installing anything: on GitHub, **Code → Codespaces → Create
 codespace**. The dev container installs the desk and starts it on port 8000, and
 the Ports tab shows the URL (private to your GitHub login unless you change it).
 
+Or hosted with its own public URL, in a couple of clicks:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ebleach2010/trading-desk)
+
+Render reads `render.yaml`, asks for your provider key, generates the
+`TRADINGDESK_API_TOKEN` the app will prompt for (find it under the service's
+Environment tab), and gives you an `https://trading-desk-….onrender.com` address.
+The free plan sleeps after 15 minutes idle and keeps no files between restarts,
+so set keys as environment variables there rather than in the app.
+
 Paste your provider's API key in the app: the box under the LLM provider
 dropdown saves it to the server's `.env` (or `TRADINGDESK_ENV_FILE`), readable
 by the server's user only, and never sends it back to the browser. The CLI's
@@ -42,7 +52,7 @@ shared with the CLI. The JSON API is documented at `/api/docs`.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `TRADINGDESK_HOST`, `TRADINGDESK_PORT` | `127.0.0.1`, `8000` | Where the server listens; `--host` and `--port` override them. |
+| `TRADINGDESK_HOST`, `TRADINGDESK_PORT` | `127.0.0.1`, `8000` | Where the server listens; `--host` and `--port` override them. A host's `PORT` variable is honored too. |
 | `TRADINGDESK_API_TOKEN` | unset | When set, every API call must send it as a bearer token. Set it before exposing the app beyond your own machine: a run spends your provider credits. |
 | `TRADINGDESK_MAX_CONCURRENT_RUNS` | `1` | How many analyses run at once; the rest wait in the queue. |
 | `TRADINGDESK_ENV_FILE` | the `.env` the package loads | Where keys pasted in the app are stored. The Docker service points it at the data volume. |

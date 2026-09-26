@@ -461,6 +461,26 @@ def test_ui_and_docs_are_served(client):
 
 
 @pytest.mark.unit
+def test_cli_honors_the_hosting_port_variable(monkeypatch):
+    import uvicorn
+
+    captured = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: captured.update(kwargs))
+    monkeypatch.delenv("TRADINGDESK_PORT", raising=False)
+    monkeypatch.delenv("TRADINGDESK_HOST", raising=False)
+    monkeypatch.setenv("PORT", "5555")
+    main([])
+    assert captured["port"] == 5555
+    assert captured["host"] == "127.0.0.1"
+    assert captured["factory"] is True
+
+    monkeypatch.setenv("TRADINGDESK_PORT", "6001")
+    main(["--host", "0.0.0.0"])
+    assert captured["port"] == 6001  # the app's own variable wins over PORT
+    assert captured["host"] == "0.0.0.0"
+
+
+@pytest.mark.unit
 def test_cli_help_exits_cleanly(capsys):
     with pytest.raises(SystemExit) as exited:
         main(["--help"])

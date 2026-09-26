@@ -477,8 +477,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("TRADINGDESK_PORT") or 8000),
-        help="port to listen on (default: TRADINGDESK_PORT or 8000)",
+        # PORT is what Render, Railway, Heroku and Fly hand a web process.
+        default=int(os.environ.get("TRADINGDESK_PORT") or os.environ.get("PORT") or 8000),
+        help="port to listen on (default: TRADINGDESK_PORT, else PORT, else 8000)",
     )
     parser.add_argument(
         "--reload", action="store_true", help="restart when the code changes (development)"
